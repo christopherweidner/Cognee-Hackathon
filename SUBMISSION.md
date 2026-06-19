@@ -127,25 +127,35 @@ After:
 Components: `demo.py` (orchestration), `brain_eval.py` (eval + LLM judge),
 `brain_lint.py` (conflict/stale detection), `my_skills/{ingestor,linter,qa-answerer}`.
 
-### Cognee Cloud (optional, rewarded)
+### Cognee Cloud (used — `serve` + `push` + live `search`)
 
-Yes — we connect and push. We build and self-improve in a local cognee instance
-(skills + the distillation/improve loop run there), then push the healed brain to
-our managed Cognee Cloud instance with `cognee.push("company-brain")`.
+Yes. We connect with `cognee.serve(...)`, host the brain in the managed instance
+with `cognee.push(...)`, and query knowledge live on Cloud with `cognee.search(...)`.
 
-- What we write to session memory (`session_id="onboarding-feedback"`): the new
-  team facts and the `SkillRunEntry` feedback for the run — the per-conversation
+- **What we write to session memory (`session_id="onboarding-feedback"`):** the new
+  team facts and the run's `SkillRunEntry` feedback — the hot, per-conversation
   scratchpad.
-- What goes straight to the permanent graph (no `session_id`): the seed company
-  docs and the ingested skills.
-- How/when content is distilled into the permanent graph: `cognee.improve(dataset,
-  session_ids=["onboarding-feedback"])` runs after the baseline eval — it applies
-  feedback weights to the nodes used to answer and cognifies the session Q&A into
-  durable graph nodes.
-- What stays session-only vs promoted: raw turn text stays in session; the durable
-  facts and feedback signal are promoted into the graph.
-- Proof the brain got smarter: baseline **2/5** → improved **5/5** in a fresh session
-  (see Self-Improvement Evidence). Push result: `status='completed', nodes=62, edges=87`.
+- **What goes straight to the permanent graph (no `session_id`):** the seed company
+  docs and the ingested skills. Knowledge ingested to Cloud with
+  `cognee.remember(text, dataset_name=...)` is cognified server-side and is
+  immediately queryable there — verified live: *"Who is the office manager?"* →
+  *"Priya Shah"* answered by the Cloud instance.
+- **How/when content is distilled into the permanent graph:** after the baseline
+  eval, `cognee.improve(dataset, session_ids=["onboarding-feedback"])` applies
+  feedback weights to the nodes used and cognifies the session Q&A into durable
+  graph nodes. We then `cognee.push("company-brain")` the healed graph to Cloud for
+  durable, cross-session hosting.
+- **What stays session-only vs promoted:** raw turn text stays in session; the
+  durable facts and the feedback signal are promoted into the permanent graph.
+- **Proof the brain got smarter:** baseline **2/5** → improved **5/5** in a fresh
+  session (see Self-Improvement Evidence). Push result:
+  `status='completed', nodes=62, edges=87`.
+
+> Transparency: on our assigned tenant the distillation step (`cognee.improve` with
+> `session_ids`) runs in our local cognee instance (the Cloud build returns 404 for
+> that endpoint and does not persist `session_id` writes), so we distill locally and
+> push the result to Cloud, where the brain's knowledge is queryable via
+> `cognee.remember` + `cognee.search`.
 
 ## Agents / Skills
 
@@ -182,19 +192,42 @@ EMBEDDING_DIMENSIONS=384
 
 ## Demo
 
-- Live demo link or local instructions: run `python demo.py` (prints BEFORE 2/5,
-  the skill rewrite, pruned stale doc, AFTER 5/5, and the Cloud push).
-- 3-minute pitch outline:
+The whole demo is one command — `python demo.py` — which prints, in order:
+BEFORE 2/5 → skill rewrite → pruned stale doc → AFTER 5/5 → Cloud push. Talk over it.
+
+3-minute spoken script (with what's on screen):
 
 ```text
-1. Problem / idea — a Company Brain that learns from its team, not a static FAQ.
-2. Ingest demo — company docs + skills + 3 new team facts into the brain.
-3. Query demo (before) — brain scores 2/5; can't answer the 3 new facts.
-4. Self-improve step — feedback rewrites the qa-answerer skill; cognee.improve
-   distills the session facts into the permanent graph; linter prunes stale 2024 doc.
-5. Query demo (after) — fresh session, brain scores 5/5 from the graph alone.
-6. What is next — automate feedback from real users; schedule lint; scale on Cloud.
+0:00  Idea — "A Company Brain shouldn't be a static FAQ. Ours learns from its
+      team and gets measurably smarter. Watch the score." Run: python demo.py
+
+0:20  Ingest — point at "Ingested 3 skills: ingestor, linter, qa-answerer" and
+      company_docs/. "Three operations as skills: Ingest, Query, Lint. Docs are in
+      the permanent graph."
+
+0:40  Query BEFORE — point at "BEFORE ... 2/5": the 3 new team facts (all-hands,
+      WiFi, office manager) FAIL — "the brain has never been told these." The 2
+      doc-based controls PASS.
+
+1:10  Self-improve + distill + lint — "Feedback fires three things:" (a) the
+      qa-answerer SKILL.md is rewritten and applied (show BEFORE/AFTER skill body);
+      (b) cognee.improve distills the session-memory facts into the PERMANENT graph
+      — the two-tier memory core; (c) the linter forgets the stale vacation_2024 doc
+      (show "Stale docs pruned: ['vacation_2024']").
+
+1:50  Query AFTER — point at "AFTER ... 5/5" in a FRESH session: all 3 facts now
+      answered. "Same questions, new session — it can only know these because they
+      were distilled into the graph. PROOF: 2/5 -> 5/5."
+
+2:20  Cloud — point at "Pushed 'company-brain' to Cognee Cloud: ... completed".
+      "Built and self-improved locally, hosted on Cognee Cloud; knowledge is also
+      queryable live there via cognee.search."
+
+2:45  Next — "Automate feedback from real users, schedule the linter, scale on Cloud."
 ```
+
+Tip: if demoing a live query *on Cloud*, ask a non-sensitive fact (e.g. "Who is the
+office manager?"). The model refuses to read out the WiFi *password* on Cloud.
 
 ## Links
 
